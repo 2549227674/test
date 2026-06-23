@@ -3,3 +3,13 @@
 /yolov5预训练模型/
 /详案/
 详案.zip
+
+# Ignore all images
+*.png
+*.jpg
+*.jpeg
+*.bmp
+*.gif
+*.webp
+*Zone.Identifier
+*:Zone.Identifier
