@@ -33,8 +33,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_MODEL_PATH = os.path.join(HERE, "model", "yolov5s_pcb.rknn")
 
 INPUT_SIZE = 640
-CONF_THRESHOLD = 0.25     # 目标置信度阈值
-IOU_THRESHOLD = 0.45      # NMS IOU 阈值
+CONF_THRESHOLD = 0.6      # 目标置信度阈值
+IOU_THRESHOLD = 0.3       # NMS IOU 阈值
 
 CLASS_NAMES_EN = theme.CLASS_NAMES_EN   # 6 类英文（顺序固定）
 CLASS_NAMES_CN = theme.CLASS_NAMES_CN   # 6 类中文（一一对应）
@@ -45,7 +45,7 @@ NUM_CLASSES = len(CLASS_NAMES_EN)
 # 这里统一把"解码后的框"换算到 640 像素空间，再做一次性的去 padding / 反缩放。
 # 若 probe 在板上确认输出 xywh 其实已经是 640 像素值（不是 0~1），
 # 把下面这个开关改成 False 即可，其余逻辑不用动。
-OUTPUT_XYWH_NORMALIZED = True
+OUTPUT_XYWH_NORMALIZED = False
 
 # 3 特征图分支用的标准 YOLOv5 anchors / strides（仅当 probe 显示是 3 个特征图时才走这条路）
 _ANCHORS = np.array([

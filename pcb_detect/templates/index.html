@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PCB 缺陷检测上位机 —— 网页版</title>
+    <!-- 引入 Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <!-- 顶部状态栏 -->
+    <header class="status-bar" id="status-bar">
+        <div class="status-left">
+            <span class="status-title">PCB 缺陷检测上位机</span>
+            <span class="status-dot-group">
+                <span id="model-status" class="status-item"><span class="dot warning"></span>模型加载中...</span>
+                <span id="npu-status" class="status-item"><span class="dot warning"></span>NPU 就绪检测中...</span>
+            </span>
+        </div>
+        <div class="status-right font-mono">
+            <span class="metric">FPS: <span id="top-fps">0.0</span></span>
+            <span class="divider">|</span>
+            <span class="metric">耗时: <span id="top-ms">0.0</span> ms</span>
+        </div>
+    </header>
+
+    <!-- 主容器 -->
+    <main class="main-container">
+        <!-- 左栏：控制与操作区 -->
+        <section class="column left-col">
+            <!-- 1. 功能配置卡片 -->
+            <div class="card" id="config-card">
+                <h2 class="card-title">功能配置</h2>
+                <div class="card-body">
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="chinese-redraw-checkbox" checked>
+                        <span class="checkmark"></span>
+                        画框显示标签 (Pillow 重绘)
+                    </label>
+                </div>
+            </div>
+
+            <!-- 2. 单张图像检测卡片 -->
+            <div class="card" id="single-upload-card">
+                <h2 class="card-title">单图检测</h2>
+                <div class="card-body">
+                    <div class="file-upload-wrapper">
+                        <input type="file" id="image-input" accept="image/*" style="display: none;">
+                        <button class="btn secondary-btn" id="select-image-btn" type="button">选择图片</button>
+                        <div id="selected-filename" class="filename-text">未选择文件</div>
+                    </div>
+                    <button class="btn primary-btn w-100" id="detect-image-btn" type="button" disabled>执行检测</button>
+                </div>
+            </div>
+
+            <!-- 3. USB 实时检测卡片 -->
+            <div class="card" id="camera-control-card">
+                <h2 class="card-title">实时检测</h2>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label for="camera-device-id">摄像头设备号 (ID):</label>
+                        <input type="number" id="camera-device-id" class="form-input w-100" value="0" min="0">
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn primary-btn" id="start-camera-btn" type="button">启动相机</button>
+                        <button class="btn danger-btn" id="stop-camera-btn" type="button" disabled>关闭相机</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. 批量文件夹检测卡片 -->
+            <div class="card" id="batch-control-card">
+                <h2 class="card-title">批量检测</h2>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label for="batch-dir-path">输入板端文件夹路径:</label>
+                        <input type="text" id="batch-dir-path" class="form-input w-100" placeholder="例如: /home/qbz415/test/pcb_detect/test_images">
+                    </div>
+                    <button class="btn primary-btn w-100" id="start-batch-btn" type="button">开始批量处理</button>
+                </div>
+            </div>
+
+            <!-- 5. 统计清空 -->
+            <div class="card" id="stats-control-card">
+                <div class="card-body py-1">
+                    <button class="btn secondary-btn w-100" id="reset-stats-btn" type="button">清空统计数据</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 中栏：核心画面显示区 -->
+        <section class="column center-col">
+            <div class="display-card">
+                <!-- 切换标签 -->
+                <div class="display-tabs">
+                    <button class="tab-btn active" id="tab-single" type="button">单图/实时画面</button>
+                    <button class="tab-btn" id="tab-batch" type="button">批量网格视图</button>
+                </div>
+
+                <div class="display-content">
+                    <!-- 单图或实时流画面 -->
+                    <div class="view-pane active" id="pane-single">
+                        <div class="canvas-container" id="canvas-container">
+                            <img id="main-display-img" src="" style="display: none;" alt="检测画面">
+                            <div id="display-placeholder" class="placeholder-text">
+                                <span class="placeholder-icon">📷</span>
+                                <span>请上传单张图片或开启摄像头实时检测</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 批量网格视图 -->
+                    <div class="view-pane" id="pane-batch">
+                        <div class="batch-grid" id="batch-grid">
+                            <div class="placeholder-text">
+                                <span class="placeholder-icon">📂</span>
+                                <span>暂无批量处理数据，请在左侧指定路径并执行批量检测</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 右栏：明细与统计区 -->
+        <section class="column right-col">
+            <!-- 1. 缺陷明细表 -->
+            <div class="card flex-grow-1" id="detail-card" style="display: flex; flex-direction: column;">
+                <h2 class="card-title">检测明细</h2>
+                <div class="table-container flex-grow-1">
+                    <table class="detail-table" id="detail-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 50px;">序号</th>
+                                <th>缺陷类别</th>
+                                <th style="width: 70px;">置信度</th>
+                                <th>坐标(xyxy)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="detail-table-body">
+                            <tr>
+                                <td colspan="4" class="no-data">无检测数据</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 2. 统计卡片 -->
+            <div class="card" id="stats-panel-card">
+                <h2 class="card-title">累计统计指标</h2>
+                <div class="card-body">
+                    <!-- 累计大指标 -->
+                    <div class="metrics-grid">
+                        <div class="metric-box">
+                            <span class="metric-label">累计张/帧数</span>
+                            <span class="metric-value font-mono" id="stat-total-frames">0</span>
+                        </div>
+                        <div class="metric-box">
+                            <span class="metric-label">累计缺陷总数</span>
+                            <span class="metric-value font-mono text-danger" id="stat-total-defects">0</span>
+                        </div>
+                        <div class="metric-box">
+                            <span class="metric-label">平均耗时 (ms)</span>
+                            <span class="metric-value font-mono text-accent" id="stat-avg-ms">0.0</span>
+                        </div>
+                        <div class="metric-box">
+                            <span class="metric-label">平均 FPS</span>
+                            <span class="metric-value font-mono text-success" id="stat-avg-fps">0.0</span>
+                        </div>
+                    </div>
+
+                    <!-- 柱状图 -->
+                    <div class="chart-wrapper">
+                        <canvas id="defect-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 弹窗：查看大图 -->
+    <div class="modal" id="image-modal">
+        <span class="modal-close" id="modal-close">&times;</span>
+        <div class="modal-content-wrapper">
+            <div class="modal-images">
+                <div class="modal-img-container">
+                    <h4>原始输入图片</h4>
+                    <img class="modal-img" id="modal-img-original" src="" alt="原始图">
+                </div>
+                <div class="modal-img-container">
+                    <h4>检测标注结果</h4>
+                    <img class="modal-img" id="modal-img-annotated" src="" alt="结果图">
+                </div>
+            </div>
+            <div class="modal-info">
+                <h3>检测明细</h3>
+                <div class="table-container flex-grow-1">
+                    <table class="detail-table" id="modal-detail-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 50px;">序号</th>
+                                <th>缺陷类别</th>
+                                <th style="width: 70px;">置信度</th>
+                                <th>坐标</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modal-detail-table-body">
+                            <tr>
+                                <td colspan="4" class="no-data">无检测数据</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 提示消息 -->
+    <div class="toast" id="toast">提示信息</div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

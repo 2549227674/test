@@ -5,3 +5,5 @@ PyQt5>=5.15
 matplotlib>=3.5
 numpy>=1.21
 opencv-python>=4.5
+Flask>=2.0
+Pillow>=8.0
