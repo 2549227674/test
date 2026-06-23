@@ -1,0 +1,7 @@
+# PCB 缺陷检测上位机 —— Python 依赖
+# 注意：rknn-toolkit-lite2（rknnlite）由 RK3588 板端系统自带，不在此列出。
+# PyQt5 推荐用系统包安装：sudo apt install python3-pyqt5
+PyQt5>=5.15
+matplotlib>=3.5
+numpy>=1.21
+opencv-python>=4.5
